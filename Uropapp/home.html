@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Home</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <style>
+        #mapid {
+            height: 500px;
+        }
+
+        #results-table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        #results-table td,
+        #results-table th {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #results-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        #results-table th,
+        #results-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        #results-table th {
+            background-color: #f2f2f2;
+        }
+
+        #results-table tr:nth-child(2) td,
+        #results-table tr:nth-child(3) td {
+            background-color: #f2f2f2;
+        }
+    </style>
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+    </script>
+</head>
+
+<body>
+    <h1>Welcome to my website!</h1>
+    <div id="mapid"></div>
+    <div id="coordinates"></div>
+    <button id="confirmstart">confirm point 1</button><span id="startCoordinates"></span><br>
+    <button id="confirmend">confitm point 2</button><span id="endCoordinates"></span><br>
+
+    <form id="calculate-path-form" style="display: none;">
+        <input type="hidden" id="start_x" name="start_x">
+        <input type="hidden" id="start_y" name="start_y">
+        <input type="hidden" id="end_x" name="end_x">
+        <input type="hidden" id="end_y" name="end_y">
+    </form>
+    <button id="calculate-path">Calculate Path</button>
+    <button id="show-paths">Show Path</button>
+    <bd>
+        <div id="path-results"></div>
+        <table id="results-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">Method</th>
+                    <th style="width: 15%;">Own Dijkstra</th>
+                    <th style="width: 15%;">NetworkX Dijkstra</th>
+                    <th style="width: 18%;">Own Bidirectional Dijkstra</th>
+                    <th style="width: 18%;">NetworkX Bidirectional Dijkstra</th>
+                    <th style="width: 13%;">Own Astar</th>
+                    <th style="width: 13%;">NetworkX Astar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>time cost</td>
+                </tr>
+                <tr>
+                    <td>length</td>
+                </tr>
+                <tr>
+                    <td>Show Paths:</td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_0" value="0" checked> Blue Path
+                        </label>
+                    </td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_1" value="1" checked> Red Path
+                        </label>
+                    </td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_2" value="2" checked> Green Path
+                        </label>
+                    </td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_3" value="3" checked> Orange Path
+                        </label>
+                    </td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_4" value="4" checked> Purple Path
+                        </label>
+                    </td>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="path_5" value="5" checked> Yellow Path
+                        </label>
+                    </td>
+                </tr>
+
+            </tbody>
+        </table>
+        <div id="map-container" style="width:100%;height:auto;">
+            <img id="map-image" src="" alt="Map Image">
+
+
+            <script>
+                var mymap = L.map('mapid').setView([25.0391667, 121.525], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+                    maxZoom: 18,
+                    tileSize: 512,
+                    zoomOffset: -1
+                }).addTo(mymap);
+
+                let start = null;
+                let end = null;
+                let selectedPoint = null;
+                var coordinates = document.getElementById('coordinates');
+
+                mymap.on('click', function (e) {
+                    var y = e.latlng.lat.toFixed(6);
+                    var x = e.latlng.lng.toFixed(6);
+                    coordinates.innerHTML = 'x: ' + x + ', y: ' + y;
+                    selectedPoint = { x: x, y: y };
+                });
+                document.getElementById("confirmstart").addEventListener("click", function () {
+                    start = selectedPoint;
+                    document.getElementById("startCoordinates").innerHTML = `x：${start.x}，y：${start.y}`;
+                });
+                document.getElementById("confirmend").addEventListener("click", function () {
+                    end = selectedPoint;
+                    document.getElementById("endCoordinates").innerHTML = `x：${end.x}，y：${end.y}`;
+                });
+
+                function displayResults(response) {
+                    const results = response.results;
+                    console.log(results); // For debugging
+                    const table = document.getElementById("results-table");
+                    const tbody = table.getElementsByTagName("tbody")[0];
+
+                    // Clear any existing rows in the table except the row headers
+                    for (let i = 2; i < tbody.rows.length - 1; i++) {
+                        let row = tbody.rows[i];
+                        for (let j = 1; j < row.cells.length; j++) {
+                            row.cells[j].innerText = "";
+                        }
+                    }
+
+                    const timeCostRow = tbody.rows[0];
+                    const lengthRow = tbody.rows[1];
+
+                    for (const method of ["own_dijkstra", "nx_dijkstra", "own_bidirectional_dijkstra", "nx_bidirectional_dijkstra", "own_A_star", "nx_A_star"]) {
+                        if (results.time_cost.hasOwnProperty(method)) {
+                            timeCostRow.insertCell(1).innerText = results.time_cost[method].toFixed(4);
+                        } else {
+                            timeCostRow.insertCell(1).innerText = "N/A";
+                        }
+                        if (results.length.hasOwnProperty(method)) {
+                            lengthRow.insertCell(1).innerText = results.length[method].toFixed(2);
+                        } else {
+                            lengthRow.insertCell(1).innerText = "N/A";
+                        }
+                    }
+                }
+
+                document.getElementById("calculate-path").addEventListener("click", function () {
+                    if (start !== null && end !== null) {
+                        var request = new XMLHttpRequest();
+                        request.open("POST", "/calculate_path/", true);
+                        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        request.setRequestHeader("X-CSRFToken", csrftoken);
+                        request.onreadystatechange = function () {
+                            if (request.readyState === 4 && request.status === 200) {
+                                console.log(request.responseText);
+                                const response = JSON.parse(request.responseText);
+                                displayResults(JSON.parse(request.responseText));
+                            }
+                        };
+                        request.send("start_x=" + start.x.toString() + "&start_y=" + start.y.toString() + "&end_x=" + end.x.toString() + "&end_y=" + end.y.toString());
+                    } else {
+                        alert("Please select both start and end points");
+                    }
+                });
+
+                document.getElementById("show-paths").addEventListener("click", function () {
+                    if (start !== null && end !== null) {
+                        const selectedIndexes = Array.from(document.querySelectorAll("#results-table tbody tr td input[type='checkbox']:checked"))
+                            .map(input => input.value);
+                        const indexes = selectedIndexes.join(",");
+                        var request = new XMLHttpRequest();
+                        request.open("POST", "/show_path/", true);
+                        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                        request.setRequestHeader("X-CSRFToken", csrftoken);
+                        request.onreadystatechange = function () {
+                            if (request.readyState === 4 && request.status === 200) {
+                                console.log("Status: ", request.status);
+                                console.log("Response: ", request.responseText);
+                                var response = JSON.parse(request.responseText);
+                                console.log("response.image_base64:", response.image_base64);
+                                var mapImage = document.getElementById("map-image");
+                                var image = new Image();
+                                image.src = "data:image/png;base64," + response.image_base64;
+                                image.onload = function () {
+                                    mapImage.src = this.src;
+                                };
+                            }
+                        };
+                        request.send("start_x=" + start.x.toString() + "&start_y=" + start.y.toString() + "&end_x=" + end.x.toString() + "&end_y=" + end.y.toString() + "&indexes=" + encodeURIComponent(indexes));
+                    } else {
+                        alert("Please select both start and end points");
+                    }
+                });
+
+            </script>
+</body>
+
+</html>
