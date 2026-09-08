@@ -1,4 +1,3 @@
-# C:\Users\natha\Urop\Uropapp\globals.py
 
 import osmnx as ox
 from osmnx import utils_geo
